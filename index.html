@@ -5,9 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Mi Capital - Control de Préstamos</title>
     <!-- Tailwind CSS -->
-
-    <link rel="apple-touch-icon" href="icon.png">
-    
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Phosphor Icons -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
@@ -167,15 +164,15 @@
             <!-- Header -->
             <div class="pt-1">
                 <h1 class="text-2xl font-bold tracking-tight text-slate-900">Amortizaciones</h1>
-                <p class="text-xs text-slate-500">Revisa y marca cuotas pagadas o pendientes</p>
+                
             </div>
 
             <!-- Loan Selector Tabs (1 to 4) -->
             <div class="grid grid-cols-4 gap-1.5 p-1 bg-slate-200/70 rounded-xl">
-                <button onclick="selectLoanTab(0)" id="loan-tab-0" class="loan-tab-btn py-1.5 text-xs font-semibold rounded-lg transition-all text-slate-600">P1</button>
-                <button onclick="selectLoanTab(1)" id="loan-tab-1" class="loan-tab-btn py-1.5 text-xs font-semibold rounded-lg transition-all text-slate-600">P2</button>
-                <button onclick="selectLoanTab(2)" id="loan-tab-2" class="loan-tab-btn py-1.5 text-xs font-semibold rounded-lg transition-all text-slate-600">P3</button>
-                <button onclick="selectLoanTab(3)" id="loan-tab-3" class="loan-tab-btn py-1.5 text-xs font-semibold rounded-lg transition-all text-slate-600">P4</button>
+                <button onclick="selectLoanTab(0)" id="loan-tab-0" class="loan-tab-btn py-1.5 text-xs font-semibold rounded-lg transition-all text-slate-600">IDH</button>
+                <button onclick="selectLoanTab(1)" id="loan-tab-1" class="loan-tab-btn py-1.5 text-xs font-semibold rounded-lg transition-all text-slate-600">DAVIVIENDA</button>
+                <button onclick="selectLoanTab(2)" id="loan-tab-2" class="loan-tab-btn py-1.5 text-xs font-semibold rounded-lg transition-all text-slate-600">FUNED</button>
+                <button onclick="selectLoanTab(3)" id="loan-tab-3" class="loan-tab-btn py-1.5 text-xs font-semibold rounded-lg transition-all text-slate-600">ALDEA GLOBAL</button>
             </div>
 
             <!-- Selected Loan Overview Header -->
@@ -190,21 +187,31 @@
                     </button>
                 </div>
 
-                <div class="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 text-center">
-                    <div>
-                        <span class="block text-[10px] text-slate-400 uppercase font-medium">Deuda Capital</span>
-                        <span id="loan-detail-balance" class="text-sm font-bold text-slate-900">$0.00</span>
-                    </div>
-                    <div>
-                        <span class="block text-[10px] text-slate-400 uppercase font-medium">Cuota Mensual</span>
-                        <span id="loan-detail-payment" class="text-sm font-bold text-slate-900">$0.00</span>
-                    </div>
-                    <div>
-                        <span class="block text-[10px] text-slate-400 uppercase font-medium">Tasa Anual</span>
-                        <span id="loan-detail-rate" class="text-sm font-bold text-slate-900">0%</span>
-                    </div>
-                </div>
-            </div>
+                <div class="grid grid-cols-2 gap-2.5 pt-3 border-t border-slate-100">
+    <!-- Fila 1: Deuda Capital -->
+    <div class="bg-slate-50/80 p-2.5 rounded-2xl border border-slate-100 flex flex-col justify-center items-center text-center">
+        <span class="block text-[9px] font-bold text-slate-400 uppercase tracking-tight">Deuda a Capital</span>
+        <span id="loan-detail-balance" class="block text-sm font-bold text-slate-900 mt-0.5">L 0.00</span>
+    </div>
+
+    <!-- Fila 1: Deuda Total con Intereses -->
+    <div class="bg-slate-50/80 p-2.5 rounded-2xl border border-slate-100 flex flex-col justify-center items-center text-center">
+        <span class="block text-[9px] font-bold text-ios-blue uppercase tracking-tight">Deuda con Intereses</span>
+        <span id="loan-detail-total-with-interest" class="block text-sm font-extrabold text-ios-blue mt-0.5">L 0.00</span>
+    </div>
+
+    <!-- Fila 2: Cuota Mensual -->
+    <div class="bg-slate-50/80 p-2.5 rounded-2xl border border-slate-100 flex flex-col justify-center items-center text-center">
+        <span class="block text-[9px] font-bold text-slate-400 uppercase tracking-tight">Cuota Mensual</span>
+        <span id="loan-detail-payment" class="block text-sm font-bold text-slate-900 mt-0.5">L 0.00</span>
+    </div>
+
+    <!-- Fila 2: Tasa Anual -->
+    <div class="bg-slate-50/80 p-2.5 rounded-2xl border border-slate-100 flex flex-col justify-center items-center text-center">
+        <span class="block text-[9px] font-bold text-slate-400 uppercase tracking-tight">Tasa Anual</span>
+        <span id="loan-detail-rate" class="block text-sm font-bold text-slate-900 mt-0.5">0%</span>
+    </div>
+</div>
 
             <!-- Table Filter & Info Bar -->
             <div class="flex justify-between items-center text-xs px-1">
@@ -547,7 +554,9 @@ function renderSummaryTab() {
     loans.forEach((loan, idx) => {
         const { schedule } = calculateAmortization(loan);
         
-        // Sumar capitales pagados de cuotas pagadas
+        // =========================================================================
+        // 1. CÁLCULO SOLO DE CAPITAL (Para el Hero Card superior y la Gráfica Circular)
+        // =========================================================================
         const paidPrincipalSum = schedule.reduce((acc, curr) => curr.isPaid ? acc + curr.principal : acc, 0);
         const remainingCapital = Math.max(0, loan.amount - paidPrincipalSum);
         
@@ -556,11 +565,21 @@ function renderSummaryTab() {
         grandTotalRemaining += remainingCapital;
 
         loanChartLabels.push(loan.name);
-        loanChartData.push(remainingCapital);
+        loanChartData.push(remainingCapital); // Mantiene el capital en la gráfica circular
 
-        // Render Card por préstamo en Resumen
-        const percentPaid = Math.min(100, Math.round((paidPrincipalSum / loan.amount) * 100));
+        // =========================================================================
+        // 2. CÁLCULO CON INTERESES (Exclusivo para la tarjeta y la barra de abajo)
+        // =========================================================================
+        const loanTotalWithInterest = schedule.reduce((acc, curr) => acc + curr.payment, 0);
+        const paidTotalWithInterest = schedule.reduce((acc, curr) => curr.isPaid ? acc + curr.payment : acc, 0);
+        const remainingTotalWithInterest = schedule.reduce((acc, curr) => !curr.isPaid ? acc + curr.payment : acc, 0);
 
+        // Porcentaje basado en el total con intereses
+        const percentPaidWithInterest = loanTotalWithInterest > 0 
+            ? Math.min(100, Math.round((paidTotalWithInterest / loanTotalWithInterest) * 100)) 
+            : 0;
+
+        // Render Card por préstamo con la BARRA DE PROGRESO CON INTERESES
         const itemHTML = `
             <div onclick="selectLoanAndSwitchTab(${idx})" class="bg-white p-3.5 rounded-2xl ios-shadow border border-slate-100 flex items-center justify-between ios-active cursor-pointer">
                 <div class="space-y-1 flex-1 pr-3">
@@ -569,16 +588,16 @@ function renderSummaryTab() {
                         <h3 class="text-xs font-bold text-slate-800 line-clamp-1">${loan.name}</h3>
                     </div>
                     <div class="flex justify-between items-center text-[11px] text-slate-500">
-                        <span>Debes: <strong class="text-slate-900">${formatCurrency(remainingCapital)}</strong></span>
-                        <span>${percentPaid}% pagado</span>
+                        <span>Debes: <strong class="text-slate-900">${formatCurrency(remainingTotalWithInterest)}</strong></span>
+                        <span>${percentPaidWithInterest}% pagado</span>
                     </div>
                     <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                        <div class="h-1.5 rounded-full" style="width: ${percentPaid}%; background-color: ${loanColors[idx % loanColors.length]}"></div>
+                        <div class="h-1.5 rounded-full" style="width: ${percentPaidWithInterest}%; background-color: ${loanColors[idx % loanColors.length]}"></div>
                     </div>
                 </div>
                 <div class="text-right pl-2 border-l border-slate-100 flex flex-col items-end justify-center">
-                    <span class="text-[10px] text-slate-400">Total Inicial</span>
-                    <span class="text-xs font-semibold text-slate-700">${formatCurrency(loan.amount)}</span>
+                    <span class="text-[10px] text-slate-400">Total del Préstamo.</span>
+                    <span class="text-xs font-semibold text-slate-700">${formatCurrency(loanTotalWithInterest)}</span>
                     <i class="ph ph-chevron-right text-slate-300 text-xs mt-1"></i>
                 </div>
             </div>
@@ -586,7 +605,7 @@ function renderSummaryTab() {
         loansListContainer.insertAdjacentHTML('beforeend', itemHTML);
     });
 
-    // Actualizar Hero Card
+    // Actualizar Hero Card Superior (Mantiene datos de CAPITAL)
     document.getElementById('hero-total-remaining').textContent = formatCurrency(grandTotalRemaining);
     document.getElementById('hero-total-paid').textContent = formatCurrency(grandTotalPaid);
     document.getElementById('hero-initial-total').textContent = formatCurrency(grandTotalInitial);
@@ -605,6 +624,7 @@ function renderSummaryTab() {
     const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
     document.getElementById('hero-next-payment').textContent = `${padZero(globalPaymentDay)} de ${monthNames[nextPayDate.getMonth()]}`;
 
+    // Renderizar gráfica circular con la deuda a CAPITAL de cada préstamo
     renderChart(loanChartLabels, loanChartData, loanColors);
 }
 
@@ -667,26 +687,45 @@ function renderLoanDetailTab() {
 
     const { monthlyPayment, schedule } = calculateAmortization(loan);
 
-    // Calcular Saldo Actual Restante
+    // =========================================================================
+    // CÁLCULO DE LOS DOS VALORES
+    // =========================================================================
+    // 1. Saldo de Capital
     const paidPrincipalSum = schedule.reduce((acc, curr) => curr.isPaid ? acc + curr.principal : acc, 0);
     const remainingCapital = Math.max(0, loan.amount - paidPrincipalSum);
 
+    // 2. Saldo Total con Intereses (Suma de cuotas pendientes)
+    const remainingTotalWithInterest = schedule.reduce((acc, curr) => !curr.isPaid ? acc + curr.payment : acc, 0);
+
+    // =========================================================================
+    // MOSTRAR EN LA INTERFAZ
+    // =========================================================================
     document.getElementById('loan-detail-tag').textContent = `Préstamo ${activeLoanIndex + 1}`;
     document.getElementById('loan-detail-title').textContent = loan.name;
+    
+    // Deuda a Capital
     document.getElementById('loan-detail-balance').textContent = formatCurrency(remainingCapital);
+
+    // Deuda Total con Intereses (Si agregas el elemento 'loan-detail-total-with-interest' en tu HTML)
+    const totalWithInterestElem = document.getElementById('loan-detail-total-with-interest');
+    if (totalWithInterestElem) {
+        totalWithInterestElem.textContent = formatCurrency(remainingTotalWithInterest);
+    }
+
     document.getElementById('loan-detail-payment').textContent = formatCurrency(monthlyPayment);
     document.getElementById('loan-detail-rate').textContent = `${loan.rate}%`;
-
     document.getElementById('amort-cuotas-count').textContent = `${schedule.length} Cuotas Total`;
 
     // Botón de Auto-modo
     const btnAuto = document.getElementById('btn-toggle-loan-auto');
-    if (loan.autoDateMode) {
-        btnAuto.textContent = "Fecha Auto: ACTIVA";
-        btnAuto.className = "text-xs font-semibold px-2.5 py-1 rounded-full border border-ios-green bg-green-50 text-ios-green";
-    } else {
-        btnAuto.textContent = "Fecha Auto: PAUSADA";
-        btnAuto.className = "text-xs font-semibold px-2.5 py-1 rounded-full border border-slate-300 bg-slate-100 text-slate-500";
+    if (btnAuto) {
+        if (loan.autoDateMode) {
+            btnAuto.textContent = "Fecha Auto: ACTIVA";
+            btnAuto.className = "text-xs font-semibold px-2.5 py-1 rounded-full border border-ios-green bg-green-50 text-ios-green";
+        } else {
+            btnAuto.textContent = "Fecha Auto: PAUSADA";
+            btnAuto.className = "text-xs font-semibold px-2.5 py-1 rounded-full border border-slate-300 bg-slate-100 text-slate-500";
+        }
     }
 
     // Render Tabla
