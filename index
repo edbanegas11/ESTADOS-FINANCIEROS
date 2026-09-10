@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Mi Capital - Control de Préstamos</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Chart.js para gráficos estilo iOS -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        ios: {
+                            blue: '#007AFF',
+                            green: '#34C759',
+                            red: '#FF3B30',
+                            orange: '#FF9500',
+                            purple: '#AF52DE',
+                            teal: '#5AC8FA',
+                            card: '#FFFFFF',
+                            bg: '#F2F2F7',
+                            gray1: '#8E8E93',
+                            gray2: '#AEAEB2',
+                            gray3: '#C7C7CC',
+                            gray4: '#D1D1D6',
+                            gray5: '#E5E5EA',
+                            gray6: '#F2F2F7',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['-apple-system', 'BlinkMacSystemFont', 'SF Pro Text', 'SF Pro Display', 'Helvetica Neue', 'Arial', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Desactivar selección de texto para sentirlo como App Nativa iOS */
+        body {
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            user-select: none;
+        }
+        /* Ocultar barra de desplazamiento manteniendo funcionalidad */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        /* Sombra suave de iOS */
+        .ios-shadow {
+            box-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.05);
+        }
+        .ios-active:active {
+            opacity: 0.7;
+            transform: scale(0.98);
+            transition: transform 0.1s ease, opacity 0.1s ease;
+        }
+    </style>
+</head>
+<body class="h-full font-sans text-slate-900 bg-ios-bg antialiased flex flex-col justify-between overflow-hidden">
+
+<div id="app" class="h-full flex flex-col max-w-md mx-auto w-full bg-ios-bg relative shadow-2xl overflow-hidden border-x border-slate-200">
+    
+    <!-- Dynamic Top Status Bar Space for iOS notch padding -->
+    <div class="pt-8 px-5 bg-ios-bg/80 backdrop-blur-md sticky top-0 z-30 flex justify-between items-center pb-2">
+        <span id="current-date-badge" class="text-xs font-semibold uppercase tracking-wider text-slate-400">Cargando fecha...</span>
+        <div class="flex items-center gap-1">
+            <span class="inline-block w-2 h-2 rounded-full bg-ios-green animate-pulse"></span>
+            <span class="text-xs font-medium text-slate-500">Auto-Actualizado</span>
+        </div>
+    </div>
+
+    <!-- MAIN SCROLLABLE CONTENT AREA -->
+    <div class="flex-1 overflow-y-auto no-scrollbar px-4 pb-24 space-y-5">
+
+        <!-- TAB 1: RESUMEN / DASHBOARD -->
+        <section id="tab-summary" class="tab-content space-y-4">
+            <!-- Header -->
+            <div class="flex justify-between items-end pt-1">
+                <div>
+                    <h1 class="text-2xl font-bold tracking-tight text-slate-900">Resumen Capital</h1>
+                    <p class="text-xs text-slate-500">Estado consolidado de tus 4 préstamos</p>
+                </div>
+                <button onclick="switchTab('settings')" class="p-2 text-ios-blue bg-white rounded-full ios-shadow ios-active">
+                    <i class="ph ph-gear text-xl"></i>
+                </button>
+            </div>
+
+            <!-- HERO CARD: Total Deuda a Capital -->
+            <div class="bg-gradient-to-br from-ios-blue to-blue-700 text-white p-5 rounded-3xl ios-shadow relative overflow-hidden">
+                <div class="absolute -right-6 -bottom-6 opacity-10 text-9xl">
+                    <i class="ph-fill ph-bank"></i>
+                </div>
+                <div class="flex justify-between items-start mb-2">
+                    <span class="text-xs font-medium uppercase tracking-wider text-blue-100">Deuda Total a Capital</span>
+                    <span id="auto-calc-badge" class="bg-white/20 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full backdrop-blur-sm">
+                        Cálculo Automático Días <span class="payment-day-text">05</span>
+                    </span>
+                </div>
+                
+                <div class="text-3xl font-extrabold tracking-tight mb-4" id="hero-total-remaining">
+                    $0.00
+                </div>
+
+                <!-- Progress Bar -->
+                <div class="space-y-1.5">
+                    <div class="flex justify-between text-xs text-blue-100 font-medium">
+                        <span>Pagado: <strong id="hero-total-paid">$0.00</strong></span>
+                        <span id="hero-paid-percentage">0%</span>
+                    </div>
+                    <div class="w-full bg-blue-900/40 rounded-full h-2.5 overflow-hidden backdrop-blur-sm">
+                        <div id="hero-progress-bar" class="bg-white h-2.5 rounded-full transition-all duration-700 ease-out" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <div class="mt-4 pt-3 border-t border-white/10 flex justify-between items-center text-xs text-blue-100">
+                    <div>
+                        <span class="block text-[10px] text-blue-200">Monto Inicial Total</span>
+                        <span id="hero-initial-total" class="font-semibold text-white">$0.00</span>
+                    </div>
+                    <div class="text-right">
+                        <span class="block text-[10px] text-blue-200">Próximo Pago Estimado</span>
+                        <span id="hero-next-payment" class="font-semibold text-white">05 de --</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chart Card -->
+            <div class="bg-white p-4 rounded-2xl ios-shadow border border-slate-100 space-y-3">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                        <i class="ph ph-chart-pie-slice text-ios-blue text-lg"></i> Distribución de Capital
+                    </h2>
+                    <span class="text-xs text-slate-400">Saldo Restante</span>
+                </div>
+                <div class="h-44 relative flex items-center justify-center">
+                    <canvas id="loansChart"></canvas>
+                </div>
+            </div>
+
+            <!-- List of Loans Summary -->
+            <div class="space-y-3">
+                <div class="flex justify-between items-center px-1">
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400">Detalle por Préstamo</h2>
+                    <span class="text-xs text-ios-blue font-medium">4 préstamos activos</span>
+                </div>
+
+                <div id="loans-summary-list" class="space-y-2.5">
+                    <!-- Dynamic Loan Items inserted here -->
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 2: TABLAS DE AMORTIZACIÓN Y GESTIÓN -->
+        <section id="tab-loans" class="tab-content hidden space-y-4">
+            <!-- Header -->
+            <div class="pt-1">
+                <h1 class="text-2xl font-bold tracking-tight text-slate-900">Amortizaciones</h1>
+                <p class="text-xs text-slate-500">Revisa y marca cuotas pagadas o pendientes</p>
+            </div>
+
+            <!-- Loan Selector Tabs (1 to 4) -->
+            <div class="grid grid-cols-4 gap-1.5 p-1 bg-slate-200/70 rounded-xl">
+                <button onclick="selectLoanTab(0)" id="loan-tab-0" class="loan-tab-btn py-1.5 text-xs font-semibold rounded-lg transition-all text-slate-600">P1</button>
+                <button onclick="selectLoanTab(1)" id="loan-tab-1" class="loan-tab-btn py-1.5 text-xs font-semibold rounded-lg transition-all text-slate-600">P2</button>
+                <button onclick="selectLoanTab(2)" id="loan-tab-2" class="loan-tab-btn py-1.5 text-xs font-semibold rounded-lg transition-all text-slate-600">P3</button>
+                <button onclick="selectLoanTab(3)" id="loan-tab-3" class="loan-tab-btn py-1.5 text-xs font-semibold rounded-lg transition-all text-slate-600">P4</button>
+            </div>
+
+            <!-- Selected Loan Overview Header -->
+            <div class="bg-white p-4 rounded-2xl ios-shadow border border-slate-100 space-y-3">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <span id="loan-detail-tag" class="text-[10px] font-bold px-2 py-0.5 bg-blue-50 text-ios-blue rounded-md uppercase">Préstamo 1</span>
+                        <h2 id="loan-detail-title" class="text-lg font-bold text-slate-900 mt-0.5">Préstamo Vehículo</h2>
+                    </div>
+                    <button onclick="openEditLoanModal()" class="text-xs text-ios-blue font-semibold flex items-center gap-1 bg-blue-50 px-2.5 py-1.5 rounded-lg ios-active">
+                        <i class="ph ph-pencil-simple"></i> Editar
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 text-center">
+                    <div>
+                        <span class="block text-[10px] text-slate-400 uppercase font-medium">Deuda Capital</span>
+                        <span id="loan-detail-balance" class="text-sm font-bold text-slate-900">$0.00</span>
+                    </div>
+                    <div>
+                        <span class="block text-[10px] text-slate-400 uppercase font-medium">Cuota Mensual</span>
+                        <span id="loan-detail-payment" class="text-sm font-bold text-slate-900">$0.00</span>
+                    </div>
+                    <div>
+                        <span class="block text-[10px] text-slate-400 uppercase font-medium">Tasa Anual</span>
+                        <span id="loan-detail-rate" class="text-sm font-bold text-slate-900">0%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table Filter & Info Bar -->
+            <div class="flex justify-between items-center text-xs px-1">
+                <span class="font-medium text-slate-500" id="amort-cuotas-count">0 Cuotas</span>
+                <div class="flex gap-2">
+                    <button onclick="toggleAutoModeForCurrentLoan()" id="btn-toggle-loan-auto" class="text-xs font-semibold px-2.5 py-1 rounded-full border border-ios-blue text-ios-blue">
+                        Auto por fecha: ON
+                    </button>
+                </div>
+            </div>
+
+            <!-- Schedule Table Card -->
+            <div class="bg-white rounded-2xl ios-shadow border border-slate-100 overflow-hidden">
+                <div class="max-h-[380px] overflow-y-auto no-scrollbar">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="bg-slate-50 sticky top-0 z-10 text-[10px] uppercase font-bold text-slate-400 border-b border-slate-100">
+                            <tr>
+                                <th class="p-2.5 text-center">#</th>
+                                <th class="p-2.5">Fecha / Estado</th>
+                                <th class="p-2.5 text-right">Abono Capital</th>
+                                <th class="p-2.5 text-right">Saldo Capital</th>
+                            </tr>
+                        </thead>
+                        <tbody id="amortization-table-body" class="divide-y divide-slate-100 text-xs">
+                            <!-- Rows generated via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 3: CONFIGURACIÓN Y AJUSTES -->
+        <section id="tab-settings" class="tab-content hidden space-y-4">
+            <!-- Header -->
+            <div class="pt-1">
+                <h1 class="text-2xl font-bold tracking-tight text-slate-900">Ajustes</h1>
+                <p class="text-xs text-slate-500">Configura fechas automáticas e información</p>
+            </div>
+
+            <!-- Global Payment Day Config -->
+            <div class="bg-white p-4 rounded-2xl ios-shadow border border-slate-100 space-y-3">
+                <h2 class="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                    <i class="ph ph-calendar-check text-ios-blue text-lg"></i> Día General de Pago
+                </h2>
+                <p class="text-xs text-slate-500">
+                    Indica el día del mes en que pagas tus cuotas. Al llegar o pasar esta fecha cada mes, la app resta automáticamente el abono a capital del saldo total.
+                </p>
+                <div class="flex items-center justify-between pt-2">
+                    <label class="text-xs font-medium text-slate-700">Día de Pago Mensual:</label>
+                    <div class="flex items-center gap-2">
+                        <input type="number" id="setting-payment-day" min="1" max="31" class="w-16 p-2 bg-slate-100 border border-slate-200 rounded-xl text-center font-bold text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-ios-blue">
+                        <span class="text-xs text-slate-500">de cada mes</span>
+                    </div>
+                </div>
+                <button onclick="saveGlobalPaymentDay()" class="w-full py-2.5 bg-ios-blue text-white font-semibold text-xs rounded-xl ios-active mt-2">
+                    Guardar Día de Pago
+                </button>
+            </div>
+
+            <!-- Data Actions -->
+            <div class="bg-white rounded-2xl ios-shadow border border-slate-100 divide-y divide-slate-100">
+                <button onclick="exportData()" class="w-full p-3.5 flex items-center justify-between text-left text-xs font-medium text-slate-700 ios-active">
+                    <span class="flex items-center gap-2">
+                        <i class="ph ph-download-simple text-ios-blue text-base"></i> Exportar Resumen a JSON/CSV
+                    </span>
+                    <i class="ph ph-caret-right text-slate-300"></i>
+                </button>
+                <button onclick="restoreDefaultData()" class="w-full p-3.5 flex items-center justify-between text-left text-xs font-medium text-ios-orange ios-active">
+                    <span class="flex items-center gap-2">
+                        <i class="ph ph-arrow-counter-clockwise text-base"></i> Restablecer Datos de Ejemplo
+                    </span>
+                    <i class="ph ph-caret-right text-slate-300"></i>
+                </button>
+            </div>
+
+            <!-- Explanation Card -->
+            <div class="bg-blue-50/70 p-4 rounded-2xl border border-blue-100 space-y-2 text-xs text-blue-900">
+                <h3 class="font-bold flex items-center gap-1.5 text-ios-blue">
+                    <i class="ph ph-info text-base"></i> ¿Cómo funciona el automatismo?
+                </h3>
+                <p class="leading-relaxed text-slate-600">
+                    Si configuras que pagas los <strong>días 05</strong> de cada mes, la aplicación compara la fecha actual con el calendario de cada préstamo. Todas las cuotas anteriores a la fecha actual hasta el día 5 se contarán como <strong>Pagadas</strong> y su abono a capital se descontará automáticamente.
+                </p>
+            </div>
+        </section>
+
+    </div>
+
+    <!-- BOTTOM TAB NAVIGATION (iOS STYLE) -->
+    <nav class="absolute bottom-0 left-0 right-0 bg-white/90 backdrop-blur-lg border-t border-slate-200/80 px-6 py-2 flex justify-around items-center z-30 pb-5">
+        <button onclick="switchTab('summary')" id="nav-btn-summary" class="nav-btn flex flex-col items-center gap-0.5 text-ios-blue">
+            <i class="ph-fill ph-house text-xl"></i>
+            <span class="text-[10px] font-medium">Resumen</span>
+        </button>
+        <button onclick="switchTab('loans')" id="nav-btn-loans" class="nav-btn flex flex-col items-center gap-0.5 text-slate-400">
+            <i class="ph ph-list-numbers text-xl"></i>
+            <span class="text-[10px] font-medium">Cuotas</span>
+        </button>
+        <button onclick="switchTab('settings')" id="nav-btn-settings" class="nav-btn flex flex-col items-center gap-0.5 text-slate-400">
+            <i class="ph ph-gear text-xl"></i>
+            <span class="text-[10px] font-medium">Ajustes</span>
+        </button>
+    </nav>
+
+    <!-- MODAL: EDITAR PARÁMETROS DEL PRÉSTAMO -->
+    <div id="edit-loan-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end justify-center hidden">
+        <div class="bg-white w-full max-w-md rounded-t-3xl p-5 space-y-4 animate-in slide-in-from-bottom duration-200">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                <h3 id="modal-title" class="font-bold text-slate-900 text-base">Editar Préstamo 1</h3>
+                <button onclick="closeEditLoanModal()" class="p-1 rounded-full text-slate-400 bg-slate-100">
+                    <i class="ph ph-x text-lg"></i>
+                </button>
+            </div>
+
+            <form id="loan-edit-form" onsubmit="handleSaveLoan(event)" class="space-y-3 text-xs">
+                <div>
+                    <label class="block text-slate-600 font-medium mb-1">Nombre del Préstamo</label>
+                    <input type="text" id="input-loan-name" required class="w-full p-2.5 bg-slate-100 border border-slate-200 rounded-xl text-slate-900 font-medium focus:ring-2 focus:ring-ios-blue focus:outline-none">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-slate-600 font-medium mb-1">Monto Inicial ($)</label>
+                        <input type="number" step="0.01" id="input-loan-amount" required class="w-full p-2.5 bg-slate-100 border border-slate-200 rounded-xl text-slate-900 font-medium focus:ring-2 focus:ring-ios-blue focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-slate-600 font-medium mb-1">Tasa Anual (%)</label>
+                        <input type="number" step="0.01" id="input-loan-rate" required class="w-full p-2.5 bg-slate-100 border border-slate-200 rounded-xl text-slate-900 font-medium focus:ring-2 focus:ring-ios-blue focus:outline-none">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-slate-600 font-medium mb-1">Plazo (Meses)</label>
+                        <input type="number" id="input-loan-term" min="1" required class="w-full p-2.5 bg-slate-100 border border-slate-200 rounded-xl text-slate-900 font-medium focus:ring-2 focus:ring-ios-blue focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-slate-600 font-medium mb-1">Fecha Primer Pago</label>
+                        <input type="date" id="input-loan-start-date" required class="w-full p-2.5 bg-slate-100 border border-slate-200 rounded-xl text-slate-900 font-medium focus:ring-2 focus:ring-ios-blue focus:outline-none">
+                    </div>
+                </div>
+
+                <div class="pt-2 flex gap-2">
+                    <button type="button" onclick="closeEditLoanModal()" class="w-1/2 py-3 bg-slate-100 text-slate-600 font-semibold rounded-xl">Cancelar</button>
+                    <button type="submit" class="w-1/2 py-3 bg-ios-blue text-white font-semibold rounded-xl ios-active">Guardar Cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION -->
+    <div id="toast-message" class="fixed top-12 left-1/2 -translate-x-1/2 bg-slate-900/90 text-white text-xs px-4 py-2 rounded-full backdrop-blur-md shadow-lg opacity-0 transition-opacity duration-300 pointer-events-none z-50">
+        Mensaje
+    </div>
+
+</div>
+
+<script>
+/**
+ * ESTADO Y CONFIGURACIÓN INICIAL
+ */
+const DEFAULT_GLOBAL_PAYMENT_DAY = 5;
+
+// Datos por defecto para los 4 préstamos
+const DEFAULT_LOANS = [
+    {
+        id: 1,
+        name: "Préstamo Hipotecario",
+        amount: 50000,
+        rate: 8.5,
+        term: 60,
+        startDate: "2025-01-05",
+        autoDateMode: true,
+        manualOverrides: {} // { cuotaNum: boolean }
+    },
+    {
+        id: 2,
+        name: "Préstamo Vehículo",
+        amount: 15000,
+        rate: 10.0,
+        term: 36,
+        startDate: "2025-02-05",
+        autoDateMode: true,
+        manualOverrides: {}
+    },
+    {
+        id: 3,
+        name: "Préstamo Personal",
+        amount: 8000,
+        rate: 12.5,
+        term: 24,
+        startDate: "2025-03-05",
+        autoDateMode: true,
+        manualOverrides: {}
+    },
+    {
+        id: 4,
+        name: "Préstamo Negocio",
+        amount: 20000,
+        rate: 9.0,
+        term: 48,
+        startDate: "2024-10-05",
+        autoDateMode: true,
+        manualOverrides: {}
+    }
+];
+
+let globalPaymentDay = DEFAULT_GLOBAL_PAYMENT_DAY;
+let loans = [];
+let activeLoanIndex = 0;
+let chartInstance = null;
+
+/**
+ * Calcula la tabla de amortización para un préstamo dado
+ */
+function calculateAmortization(loan) {
+    const P = parseFloat(loan.amount);
+    const annualRate = parseFloat(loan.rate);
+    const r = (annualRate / 100) / 12; // tasa mensual
+    const n = parseInt(loan.term);
+    
+    // Cálculo de cuota fija (sistema francés)
+    let monthlyPayment = 0;
+    if (r > 0) {
+        monthlyPayment = P * (r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
+    } else {
+        monthlyPayment = P / n;
+    }
+
+    let balance = P;
+    const schedule = [];
+    
+    // Fecha inicial
+    const startDateParts = loan.startDate.split('-');
+    let currentYear = parseInt(startDateParts[0]);
+    let currentMonth = parseInt(startDateParts[1]) - 1; // 0-indexed
+    let paymentDay = globalPaymentDay || parseInt(startDateParts[2]);
+
+    const today = new Date();
+    today.setHours(23, 59, 59, 999); // Final del día para comparación justa
+
+    for (let i = 1; i <= n; i++) {
+        const interest = balance * r;
+        const principal = monthlyPayment - interest;
+        balance = Math.max(0, balance - principal);
+
+        // Calcular fecha de pago para la cuota i
+        const paymentDate = new Date(currentYear, currentMonth, paymentDay);
+        
+        // Determinar si la cuota está pagada
+        let isPaid = false;
+
+        if (loan.manualOverrides && loan.manualOverrides[i] !== undefined) {
+            // Prevalece selección manual
+            isPaid = loan.manualOverrides[i];
+        } else if (loan.autoDateMode) {
+            // Automático por fecha: si la fecha de pago de la cuota ya transcurrió
+            isPaid = paymentDate <= today;
+        }
+
+        schedule.push({
+            installment: i,
+            date: paymentDate,
+            dateStr: formatDate(paymentDate),
+            payment: monthlyPayment,
+            interest: interest,
+            principal: principal,
+            remainingBalance: balance,
+            isPaid: isPaid
+        });
+
+        // Avanzar un mes
+        currentMonth++;
+        if (currentMonth > 11) {
+            currentMonth = 0;
+            currentYear++;
+        }
+    }
+
+    return {
+        monthlyPayment,
+        schedule
+    };
+}
+
+function loadData() {
+    try {
+        const savedLoans = localStorage.getItem('mi_capital_loans');
+        const savedDay = localStorage.getItem('mi_capital_payment_day');
+        
+        if (savedLoans) {
+            loans = JSON.parse(savedLoans);
+        } else {
+            loans = JSON.parse(JSON.stringify(DEFAULT_LOANS));
+        }
+
+        if (savedDay) {
+            globalPaymentDay = parseInt(savedDay);
+        } else {
+            globalPaymentDay = DEFAULT_GLOBAL_PAYMENT_DAY;
+        }
+    } catch (e) {
+        console.error("Error al cargar datos:", e);
+        loans = JSON.parse(JSON.stringify(DEFAULT_LOANS));
+        globalPaymentDay = DEFAULT_GLOBAL_PAYMENT_DAY;
+    }
+}
+
+function saveData() {
+    localStorage.setItem('mi_capital_loans', JSON.stringify(loans));
+    localStorage.setItem('mi_capital_payment_day', globalPaymentDay.toString());
+}
+
+function updateUI() {
+    updateHeaderDate();
+    renderSummaryTab();
+    renderLoanDetailTab();
+    document.getElementById('setting-payment-day').value = globalPaymentDay;
+    document.querySelectorAll('.payment-day-text').forEach(el => el.textContent = padZero(globalPaymentDay));
+}
+
+function updateHeaderDate() {
+    const now = new Date();
+    const options = { weekday: 'short', month: 'short', day: 'numeric' };
+    document.getElementById('current-date-badge').textContent = now.toLocaleDateString('es-ES', options);
+}
+
+function renderSummaryTab() {
+    let grandTotalInitial = 0;
+    let grandTotalRemaining = 0;
+    let grandTotalPaid = 0;
+
+    const loanChartLabels = [];
+    const loanChartData = [];
+    const loanColors = ['#007AFF', '#34C759', '#FF9500', '#AF52DE'];
+
+    const loansListContainer = document.getElementById('loans-summary-list');
+    loansListContainer.innerHTML = '';
+
+    loans.forEach((loan, idx) => {
+        const { schedule } = calculateAmortization(loan);
+        
+        // Sumar capitales pagados de cuotas pagadas
+        const paidPrincipalSum = schedule.reduce((acc, curr) => curr.isPaid ? acc + curr.principal : acc, 0);
+        const remainingCapital = Math.max(0, loan.amount - paidPrincipalSum);
+        
+        grandTotalInitial += loan.amount;
+        grandTotalPaid += paidPrincipalSum;
+        grandTotalRemaining += remainingCapital;
+
+        loanChartLabels.push(loan.name);
+        loanChartData.push(remainingCapital);
+
+        // Render Card por préstamo en Resumen
+        const percentPaid = Math.min(100, Math.round((paidPrincipalSum / loan.amount) * 100));
+
+        const itemHTML = `
+            <div onclick="selectLoanAndSwitchTab(${idx})" class="bg-white p-3.5 rounded-2xl ios-shadow border border-slate-100 flex items-center justify-between ios-active cursor-pointer">
+                <div class="space-y-1 flex-1 pr-3">
+                    <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full" style="background-color: ${loanColors[idx % loanColors.length]}"></span>
+                        <h3 class="text-xs font-bold text-slate-800 line-clamp-1">${loan.name}</h3>
+                    </div>
+                    <div class="flex justify-between items-center text-[11px] text-slate-500">
+                        <span>Debes: <strong class="text-slate-900">${formatCurrency(remainingCapital)}</strong></span>
+                        <span>${percentPaid}% pagado</span>
+                    </div>
+                    <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                        <div class="h-1.5 rounded-full" style="width: ${percentPaid}%; background-color: ${loanColors[idx % loanColors.length]}"></div>
+                    </div>
+                </div>
+                <div class="text-right pl-2 border-l border-slate-100 flex flex-col items-end justify-center">
+                    <span class="text-[10px] text-slate-400">Total Inicial</span>
+                    <span class="text-xs font-semibold text-slate-700">${formatCurrency(loan.amount)}</span>
+                    <i class="ph ph-chevron-right text-slate-300 text-xs mt-1"></i>
+                </div>
+            </div>
+        `;
+        loansListContainer.insertAdjacentHTML('beforeend', itemHTML);
+    });
+
+    // Actualizar Hero Card
+    document.getElementById('hero-total-remaining').textContent = formatCurrency(grandTotalRemaining);
+    document.getElementById('hero-total-paid').textContent = formatCurrency(grandTotalPaid);
+    document.getElementById('hero-initial-total').textContent = formatCurrency(grandTotalInitial);
+
+    const overallPercent = grandTotalInitial > 0 ? Math.min(100, Math.round((grandTotalPaid / grandTotalInitial) * 100)) : 0;
+    document.getElementById('hero-paid-percentage').textContent = `${overallPercent}%`;
+    document.getElementById('hero-progress-bar').style.width = `${overallPercent}%`;
+
+    // Próximo pago
+    const today = new Date();
+    let nextMonth = today.getMonth();
+    if (today.getDate() > globalPaymentDay) {
+        nextMonth++;
+    }
+    const nextPayDate = new Date(today.getFullYear(), nextMonth, globalPaymentDay);
+    const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+    document.getElementById('hero-next-payment').textContent = `${padZero(globalPaymentDay)} de ${monthNames[nextPayDate.getMonth()]}`;
+
+    renderChart(loanChartLabels, loanChartData, loanColors);
+}
+
+function renderChart(labels, data, colors) {
+    const ctx = document.getElementById('loansChart').getContext('2d');
+    
+    if (chartInstance) {
+        chartInstance.destroy();
+    }
+
+    chartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: data,
+                backgroundColor: colors,
+                borderWidth: 3,
+                borderColor: '#ffffff',
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: {
+                        boxWidth: 10,
+                        font: { size: 10, family: '-apple-system' },
+                        color: '#475569'
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return ` ${context.label}: ${formatCurrency(context.raw)}`;
+                        }
+                    }
+                }
+            },
+            cutout: '70%'
+        }
+    });
+}
+
+function renderLoanDetailTab() {
+    const loan = loans[activeLoanIndex];
+    if (!loan) return;
+
+    // Actualizar selectores de pestañas P1, P2, P3, P4
+    document.querySelectorAll('.loan-tab-btn').forEach((btn, i) => {
+        if (i === activeLoanIndex) {
+            btn.className = "loan-tab-btn py-1.5 text-xs font-bold rounded-lg bg-white text-ios-blue shadow-sm";
+        } else {
+            btn.className = "loan-tab-btn py-1.5 text-xs font-medium rounded-lg text-slate-500";
+        }
+    });
+
+    const { monthlyPayment, schedule } = calculateAmortization(loan);
+
+    // Calcular Saldo Actual Restante
+    const paidPrincipalSum = schedule.reduce((acc, curr) => curr.isPaid ? acc + curr.principal : acc, 0);
+    const remainingCapital = Math.max(0, loan.amount - paidPrincipalSum);
+
+    document.getElementById('loan-detail-tag').textContent = `Préstamo ${activeLoanIndex + 1}`;
+    document.getElementById('loan-detail-title').textContent = loan.name;
+    document.getElementById('loan-detail-balance').textContent = formatCurrency(remainingCapital);
+    document.getElementById('loan-detail-payment').textContent = formatCurrency(monthlyPayment);
+    document.getElementById('loan-detail-rate').textContent = `${loan.rate}%`;
+
+    document.getElementById('amort-cuotas-count').textContent = `${schedule.length} Cuotas Total`;
+
+    // Botón de Auto-modo
+    const btnAuto = document.getElementById('btn-toggle-loan-auto');
+    if (loan.autoDateMode) {
+        btnAuto.textContent = "Fecha Auto: ACTIVA";
+        btnAuto.className = "text-xs font-semibold px-2.5 py-1 rounded-full border border-ios-green bg-green-50 text-ios-green";
+    } else {
+        btnAuto.textContent = "Fecha Auto: PAUSADA";
+        btnAuto.className = "text-xs font-semibold px-2.5 py-1 rounded-full border border-slate-300 bg-slate-100 text-slate-500";
+    }
+
+    // Render Tabla
+    const tbody = document.getElementById('amortization-table-body');
+    tbody.innerHTML = '';
+
+    schedule.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.className = item.isPaid ? "bg-emerald-50/50" : "hover:bg-slate-50";
+
+        tr.innerHTML = `
+            <td class="p-2.5 text-center font-bold text-slate-400 text-[11px]">${item.installment}</td>
+            <td class="p-2.5">
+                <div class="font-medium text-slate-800 text-[11px]">${item.dateStr}</div>
+                <button onclick="toggleManualInstallment(${item.installment})" class="mt-0.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                    item.isPaid ? 'bg-ios-green text-white' : 'bg-slate-200 text-slate-600'
+                }">
+                    <i class="ph ${item.isPaid ? 'ph-check-circle-fill' : 'ph-clock'} text-[10px]"></i>
+                    ${item.isPaid ? 'PAGADA' : 'PENDIENTE'}
+                </button>
+            </td>
+            <td class="p-2.5 text-right font-medium text-slate-700">${formatCurrency(item.principal)}</td>
+            <td class="p-2.5 text-right font-semibold text-slate-900">${formatCurrency(item.remainingBalance)}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function selectLoanTab(index) {
+    activeLoanIndex = index;
+    renderLoanDetailTab();
+}
+
+function selectLoanAndSwitchTab(index) {
+    activeLoanIndex = index;
+    switchTab('loans');
+}
+
+function switchTab(tabName) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+    document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+
+    // Estilos botones de navegación
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.classList.remove('text-ios-blue');
+        btn.classList.add('text-slate-400');
+    });
+
+    const activeNavBtn = document.getElementById(`nav-btn-${tabName}`);
+    if (activeNavBtn) {
+        activeNavBtn.classList.remove('text-slate-400');
+        activeNavBtn.classList.add('text-ios-blue');
+    }
+
+    if (tabName === 'summary') {
+        renderSummaryTab();
+    } else if (tabName === 'loans') {
+        renderLoanDetailTab();
+    }
+}
+
+function toggleManualInstallment(installmentNum) {
+    const loan = loans[activeLoanIndex];
+    if (!loan.manualOverrides) loan.manualOverrides = {};
+
+    const { schedule } = calculateAmortization(loan);
+    const currentItem = schedule.find(s => s.installment === installmentNum);
+
+    // Cambiar estado
+    loan.manualOverrides[installmentNum] = !currentItem.isPaid;
+
+    saveData();
+    renderLoanDetailTab();
+    renderSummaryTab();
+    showToast(`Cuota #${installmentNum} actualizada`);
+}
+
+function toggleAutoModeForCurrentLoan() {
+    const loan = loans[activeLoanIndex];
+    loan.autoDateMode = !loan.autoDateMode;
+    saveData();
+    renderLoanDetailTab();
+    renderSummaryTab();
+    showToast(loan.autoDateMode ? "Cálculo por fecha activado" : "Cálculo por fecha desactivado");
+}
+
+function saveGlobalPaymentDay() {
+    const val = parseInt(document.getElementById('setting-payment-day').value);
+    if (val >= 1 && val <= 31) {
+        globalPaymentDay = val;
+        saveData();
+        updateUI();
+        showToast("Día de pago actualizado");
+    } else {
+        showToast("Por favor ingresa un día válido (1-31)");
+    }
+}
+
+function openEditLoanModal() {
+    const loan = loans[activeLoanIndex];
+    document.getElementById('modal-title').textContent = `Editar Préstamo ${activeLoanIndex + 1}`;
+    document.getElementById('input-loan-name').value = loan.name;
+    document.getElementById('input-loan-amount').value = loan.amount;
+    document.getElementById('input-loan-rate').value = loan.rate;
+    document.getElementById('input-loan-term').value = loan.term;
+    document.getElementById('input-loan-start-date').value = loan.startDate;
+
+    document.getElementById('edit-loan-modal').classList.remove('hidden');
+}
+
+function closeEditLoanModal() {
+    document.getElementById('edit-loan-modal').classList.add('hidden');
+}
+
+function handleSaveLoan(e) {
+    e.preventDefault();
+    const loan = loans[activeLoanIndex];
+    
+    loan.name = document.getElementById('input-loan-name').value;
+    loan.amount = parseFloat(document.getElementById('input-loan-amount').value);
+    loan.rate = parseFloat(document.getElementById('input-loan-rate').value);
+    loan.term = parseInt(document.getElementById('input-loan-term').value);
+    loan.startDate = document.getElementById('input-loan-start-date').value;
+
+    saveData();
+    closeEditLoanModal();
+    updateUI();
+    showToast("Préstamo actualizado");
+}
+
+function restoreDefaultData() {
+    loans = JSON.parse(JSON.stringify(DEFAULT_LOANS));
+    globalPaymentDay = DEFAULT_GLOBAL_PAYMENT_DAY;
+    saveData();
+    updateUI();
+    showToast("Datos restablecidos de ejemplo");
+}
+
+function exportData() {
+    const exportObject = {
+        globalPaymentDay,
+        loans,
+        exportDate: new Date().toISOString()
+    };
+    
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObject, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", `Mi_Capital_Prestamos_${new Date().toISOString().slice(0,10)}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+    showToast("Datos exportados exitosamente");
+}
+
+function formatCurrency(val) {
+    return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'HNL',
+        minimumFractionDigits: 2
+    }).format(val);
+}
+
+function formatDate(dateObj) {
+    const d = padZero(dateObj.getDate());
+    const m = padZero(dateObj.getMonth() + 1);
+    const y = dateObj.getFullYear();
+    return `${d}/${m}/${y}`;
+}
+
+function padZero(num) {
+    return num < 10 ? `0${num}` : num;
+}
+
+function showToast(msg) {
+    const toast = document.getElementById('toast-message');
+    toast.textContent = msg;
+    toast.classList.remove('opacity-0');
+    toast.classList.add('opacity-100');
+    setTimeout(() => {
+        toast.classList.remove('opacity-100');
+        toast.classList.add('opacity-0');
+    }, 2200);
+}
+
+// Inicialización de la aplicación
+window.onload = function() {
+    loadData();
+    updateUI();
+};
+</script>
+</body>
+</html>
